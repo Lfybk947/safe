@@ -1,0 +1,681 @@
+https://struchkov.dev/blog/ru/lambda-expression-java/
+
+Функциональные интерфейсы и лямбды в Java
+Эволюция Java-кода: от анонимных классов к лямбда-выражениям.
+
+Лямбда-выражения — это компактный способ записи анонимных функций в Java, который упрощает код. Они появились в Java 8 и стали важной частью функционального программирования в языке. Лямбда-выражения сокращают объем кода, устраняя необходимость в громоздких анонимных классах.
+
+Когда я был наставником на курсе Яндекс.Практикум, одной из самых сложных тем для студентов был именно функциональный подход в Java. Многие находили этот стиль «ломающим мозг», поскольку он сильно отличается от традиционного объектно-ориентированного подхода 🤯
+
+Цель этой статьи — продемонстрировать эволюцию Java-кода: от классического объектно-ориентированного подхода к использованию лямбд. Мы рассмотрим, как одна и та же задача решается через обычные классы, анонимные классы и лямбда-выражения. Такой пошаговый подход поможет новичкам плавно освоить функциональный стиль программирования.
+
+Решаем задачу в лоб
+Представим, что перед нами стоит задача разработать класс для выполнения различных преобразований строк. На первом этапе заказчик требует реализации двух функций:
+
+Проверка длины строки — если длина строки превышает 10 символов, выводится предупреждение.
+Преобразование строки в верхний регистр.
+Для начала создадим класс StringProcessor, который будет выполнять оба преобразования в одном методе.
+
+public class StringProcessor {
+
+    // Публичный метод, который выполняет все преобразования
+    public String process(String input) {
+        // Проверка длины строки
+        if (input.length() > 10) {
+            System.out.println("String is too long!");
+        } else {
+            System.out.println("String length is fine.");
+        }
+
+        // Преобразование строки в верхний регистр
+        return input.toUpperCase();
+    }
+}
+На данном этапе класс работает корректно и удовлетворяет требованиям заказчика. Эти методы можно использовать следующим образом:
+
+public class Main {
+    public static void main(String[] args) {
+        StringProcessor processor = new StringProcessor();
+        String testString = "hello world";
+        
+        processor.processString(testString);
+    }
+}
+String is too long!
+Processed string: HELLO WORLD
+Через некоторое время заказчик просит добавить третью функцию — замена символов. Строка должна изменяться так, чтобы все вхождения одного символа заменялись на другой. Мы можем обновить метод process, добавив это преобразование:
+
+public class StringProcessor {
+
+    // Публичный метод, который выполняет все преобразования
+    public String process(String input) {
+        // Проверка длины строки
+        if (input.length() > 10) {
+            System.out.println("String is too long!");
+        } else {
+            System.out.println("String length is fine.");
+        }
+
+        // Преобразование строки в верхний регистр
+        String upperCased = input.toUpperCase();
+
+        // Замена символов (заменяем 'O' на '0')
+        return upperCased.replace('O', '0');
+    }
+}
+Теперь класс поддерживает три преобразования: проверку длины строки, преобразование в верхний регистр и замену символов.
+
+Хотя класс выполняет все необходимые преобразования, текущий подход начинает показывать свои ограничения:
+
+Жёстко закодированные преобразования: Каждый раз, когда необходимо добавить новое преобразование, нам приходится изменять код метода process, что нарушает принцип открытости/закрытости (OCP). Это делает код менее гибким и сложным для поддержки.
+Сложность расширения: С увеличением количества преобразований код метода process станет громоздким и трудным для тестирования. Каждый шаг изменения требует изменения основного метода, что затрудняет масштабирование и поддержку кода.
+Добавляем интерфейс
+Чтобы сделать код более гибким, вынесем функциональность в отдельный интерфейс. Каждый метод интерфейса будет выполнять одно преобразование, а реализацию можно будет внедрять через метод-сеттер.
+
+Создадим интерфейс StringOperation, который будет задавать контракт для выполнения различных операций над строками:
+
+public interface StringOperation {
+
+    // Проверка длины строки
+    void checkLength(String input);
+
+    // Преобразование строки в верхний регистр
+    String toUpperCase(String input);
+
+    // Замена подстрок
+    String replaceCharacters(String input, char oldChar, char newChar);
+    
+}
+Теперь изменим реализацию класса StringProcessor, чтобы он принимал объект, реализующий интерфейс StringOperation, через сеттер. Это позволит гибко заменять логику работы с преобразованиями строк:
+
+public class StringProcessor {
+
+    private StringOperation stringOperation;
+
+    // Сеттер для внедрения интерфейса StringOperation
+    public void setStringOperation(StringOperation stringOperation) {
+        this.stringOperation = stringOperation;
+    }
+
+    // Публичный метод для обработки строки, использующий внедренные операции
+    public String process(String input) {
+        stringOperation.checkLength(input);    // Проверка длины
+        input = stringOperation.toUpperCase(input);    // Преобразование в верхний регистр
+        return stringOperation.replaceCharacters(input, 'O', '0'); // Замена символов
+    }
+}
+Теперь StringProcessor больше не содержит жёстко закодированной логики для преобразований. Все операции над строками выполняются через внедрённую реализацию интерфейса StringOperation. Это позволяет изменять поведение StringProcessor не меняя код этого класса. Также это позволяет протестировать каждую операцию по отдельности.
+
+Создадим класс DefaultStringOperation, который реализует интерфейс StringOperation. В этом классе будет описана стандартная логика преобразований строк:
+
+public class DefaultStringOperation implements StringOperation {
+
+    @Override
+    public void checkLength(String input) {
+        if (input.length() > 10) {
+            System.out.println("String is too long!");
+        } else {
+            System.out.println("String length is fine.");
+        }
+    }
+
+    @Override
+    public String toUpperCase(String input) {
+        return input.toUpperCase();
+    }
+
+    @Override
+    public String replaceCharacters(String input, char oldChar, char newChar) {
+        return input.replace(oldChar, newChar);
+    }
+}
+Теперь мы можем использовать StringProcessor с внедрённой реализацией StringOperation. Это демонстрирует гибкость кода и возможность замены логики работы с преобразованиями через инверсию управления (IoC):
+
+public class Main {
+    public static void main(String[] args) {
+        StringProcessor processor = new StringProcessor();
+        DefaultStringOperation operations = new DefaultStringOperation();
+        
+        // Внедряем операции в StringProcessor через сеттер
+        processor.setStringOperation(operations);
+        
+        String testString = "hello world";
+        String result = processor.process(testString);
+
+        System.out.println("Result: " + result);
+    }
+}
+Теперь StringProcessor можно легко модифицировать без изменения его внутренней логики. Любые новые преобразования можно добавить, создавая новые реализации интерфейса StringOperation.
+
+Подписывайся
+на Struchkov.Dev в Telegram
+Анонимный класс
+На предыдущем этапе мы создали интерфейс StringOperation и реализовали его через отдельный класс. Однако, если требуется временно изменить логику, можно использовать анонимные классы, чтобы избежать создания новых классов для каждого преобразования. Анонимные классы позволяют реализовать интерфейс “на лету”, прямо в месте использования, без необходимости создавать отдельный файл или класс.
+
+Предположим, заказчик временно хочет изменить логику проверки длины строки, установив другой порог — например, 7 символов вместо 10. В этом случае анонимный класс позволяет задать новый порог, сохранив текущую структуру программы.
+
+Вот как можно внедрить эту логику:
+
+public class Main {
+    public static void main(String[] args) {
+        StringProcessor processor = new StringProcessor();
+        String testString = "hello world";
+
+        // Анонимный класс с собственной конфигурацией порога
+        StringOperation customLengthCheck = new StringOperation() {
+            private int threshold = 7; // Порог длины строки
+
+            @Override
+            public void checkLength(String input) {
+                if (input.length() > threshold) {
+                    System.out.println("String is too long!");
+                } else {
+                    System.out.println("String length is fine.");
+                }
+            }
+
+            @Override
+            public String toUpperCase(String input) {
+                return input.toUpperCase();
+            }
+
+            @Override
+            public String replaceCharacters(String input, char oldChar, char newChar) {
+                return input.replace(oldChar, newChar);
+            }
+        };
+
+        // Внедрение анонимного класса через сеттер
+        processor.setStringOperation(customLengthCheck);
+
+        // Использование StringProcessor с изменённой логикой
+        String result = processor.process(testString);
+        System.out.println("Result: " + result);
+    }
+}
+В данном примере мы создаём анонимный класс, который реализует интерфейс StringOperation прямо в месте использования, без создания отдельного файла или класса. Порог длины строки изменён на 7 символов за счёт переменной threshold, которая хранится внутри анонимного класса. Это позволяет гибко менять логику метода checkLength без изменения основного класса StringProcessor.
+
+Функциональный интерфейс
+Ранее мы использовали единый интерфейс для всех преобразований строк. Однако для повышения гибкости и расширяемости кода лучше создать отдельные функциональные интерфейсы для каждого действия. Это позволит управлять каждой операцией независимо и упростит использование лямбда-выражений.
+
+Чем функциональный интерфейс отличается от обычного?
+
+Функциональный интерфейс — это интерфейс, содержащий только один абстрактный метод. Его отличие от обычного интерфейса в том, что он предназначен для использования в лямбда-выражениях или ссылках на методы.
+
+Функциональные интерфейсы могут иметь методы по умолчанию или статические методы, но они должны содержать только один абстрактный метод.
+
+Для обозначения функциональных интерфейсов в Java используется аннотация @FunctionalInterface, которая помогает компилятору и разработчикам понимать, что интерфейс предназначен для работы с лямбдами.
+
+Для каждой операции по работе со строками создадим отдельный функциональный интерфейс:
+
+@FunctionalInterface
+public interface LengthChecker {
+    void checkLength(String input);
+}
+
+@FunctionalInterface
+public interface UpperCaseConverter {
+    String toUpperCase(String input);
+}
+
+@FunctionalInterface
+public interface CharacterReplacer {
+    String replaceCharacters(String input, char oldChar, char newChar);
+}
+Эти интерфейсы отвечают за выполнение отдельных операций и могут быть реализованы как через анонимные классы, так и через лямбда-выражения.
+
+Теперь перепишем класс StringProcessor, чтобы он принимал функциональные интерфейсы через сеттеры. Это позволит динамически изменять логику обработки строк:
+
+public class StringProcessor {
+
+    private LengthChecker lengthChecker;
+    private UpperCaseConverter upperCaseConverter;
+    private CharacterReplacer characterReplacer;
+
+    // Сеттеры для установки функциональных интерфейсов
+    public void setLengthChecker(LengthChecker lengthChecker) {
+        this.lengthChecker = lengthChecker;
+    }
+
+    public void setUpperCaseConverter(UpperCaseConverter upperCaseConverter) {
+        this.upperCaseConverter = upperCaseConverter;
+    }
+
+    public void setCharacterReplacer(CharacterReplacer characterReplacer) {
+        this.characterReplacer = characterReplacer;
+    }
+
+    // Основной метод, который выполняет все операции
+    public String process(String input) {
+        // Выполняем проверку длины
+        if (lengthChecker != null) {
+            lengthChecker.checkLength(input);
+        } else {
+            System.out.println("LengthChecker is not set!");
+        }
+
+        // Преобразуем строку в верхний регистр
+        if (upperCaseConverter != null) {
+            input = upperCaseConverter.toUpperCase(input);
+        }
+
+        // Заменяем символы
+        if (characterReplacer != null) {
+            input = characterReplacer.replaceCharacters(input, 'O', '0');
+        }
+
+        return input;  // Возвращаем результат после всех преобразований
+    }
+}
+Теперь класс StringProcessor больше не содержит жёстко закодированную логику. Все преобразования могут передаваться через сеттеры, что делает код гибким и легко модифицируемым.
+
+Для временных или специфических задач пользователь может внедрять свои реализации через анонимные классы. Это позволяет изменить логику обработки строк, не изменяя исходный код класса StringProcessor.
+
+public class Main {
+    public static void main(String[] args) {
+        String testString = "hello world";
+
+        StringProcessor processor = new StringProcessor();
+
+        // Внедряем проверку длины через анонимный класс
+        processor.setLengthChecker(new LengthChecker() {
+            private int threshold = 5;
+
+            @Override
+            public void checkLength(String input) {
+                if (input.length() > threshold) {
+                    System.out.println("String is too long!");
+                } else {
+                    System.out.println("String length is fine.");
+                }
+            }
+        });
+
+        // Внедряем преобразование в верхний регистр
+        processor.setUpperCaseConverter(new UpperCaseConverter() {
+            @Override
+            public String toUpperCase(String input) {
+                return input.toUpperCase();
+            }
+        });
+
+        // Внедряем замену символов
+        processor.setCharacterReplacer(new CharacterReplacer() {
+            @Override
+            public String replaceCharacters(String input, char oldChar, char newChar) {
+                return input.replace(oldChar, newChar);
+            }
+        });
+
+        // Используем StringProcessor для обработки строки
+        String result = processor.process(testString);
+        System.out.println("Result: " + result);
+    }
+}
+Подписывайся
+на Struchkov.Dev в Telegram
+Использование лямбда-выражений
+На предыдущем этапе мы использовали анонимные классы для реализации функциональных интерфейсов через сеттеры. Теперь упростим этот процесс с помощью лямбда-выражений. Поскольку каждый из наших интерфейсов является функциональным, их можно реализовать с помощью лямбд.
+
+Рассмотрим, как можно заменить анонимные классы на лямбда-выражения:
+
+public class Main {
+    public static void main(String[] args) {
+        String testString = "hello world";
+
+        StringProcessor processor = new StringProcessor();
+
+        // Внедряем проверку длины через лямбда-выражение
+        processor.setLengthChecker(input -> {
+            int threshold = 5; // Локальная переменная
+            if (input.length() > threshold) {
+                System.out.println("String is too long!");
+            } else {
+                System.out.println("String length is fine.");
+            }
+            return input;  // Возвращаем строку для дальнейшей обработки
+        });
+
+        // Внедряем преобразование в верхний регистр через лямбда-выражение
+        processor.setUpperCaseConverter((String input) -> {return input.toUpperCase();});
+
+        // Внедряем замену символов через лямбда-выражение
+        processor.setCharacterReplacer((input, oldChar, newChar) -> input.replace(oldChar, newChar));
+
+        // Используем StringProcessor для выполнения всех операций
+        String result = processor.process(testString);
+        System.out.println("Final Result: " + result);
+    }
+}
+Использование лямбда-выражений делает код более лаконичным. Однако лямбды можно сделать ещё более компактными.
+
+Упрощение лямбда-выражений
+Рассмотрим процесс упрощения на примере метода преобразования строки в верхний регистр.
+
+Полная запись:
+
+processor.setUpperCaseConverter((String input) -> {return input.toUpperCase();});
+Здесь:
+
+(String input) — явное указание типа параметра (String) и его имени (input).
+-> — оператор лямбда-выражения, который указывает, что справа от него находится тело лямбды.
+{return input.toUpperCase();} — полное тело лямбды, где явно используется оператор return.
+Упрощение 1: убираем явное указание типа параметра, так как Java может его вывести автоматически:
+
+processor.setUpperCaseConverter((input) -> {return input.toUpperCase();});
+Упрощение 2: если параметр только один, скобки вокруг него можно опустить:
+
+processor.setUpperCaseConverter(input -> {return input.toUpperCase();});
+Упрощение 3: если тело лямбды состоит из одного выражения, можно убрать фигурные скобки и оператор return:
+
+processor.setUpperCaseConverter(input -> input.toUpperCase());
+Полный пример упрощения:
+
+// Полное лямбда-выражение
+processor.setUpperCaseConverter((String input) -> {return input.toUpperCase();});
+
+// Упрощение 1: убираем тип параметра
+processor.setUpperCaseConverter((input) -> {return input.toUpperCase();});
+
+// Упрощение 2: убираем скобки вокруг параметра
+processor.setUpperCaseConverter(input -> {return input.toUpperCase();});
+
+// Упрощение 3: убираем фигурные скобки и return
+processor.setUpperCaseConverter(input -> input.toUpperCase());
+Отложенное выполнение лямбда-выражений
+Одной из важных особенностей лямбда-выражений является их отложенное выполнение. Лямбда-выражение не выполняется в момент объявления, а его выполнение откладывается до вызова метода, который использует эту лямбду. По сути, лямбда сохраняется как ссылка на код и выполняется только тогда, когда это необходимо.
+
+Рассмотрим пример:
+
+public class Main {
+    public static void main(String[] args) throws InterruptedException {
+        StringProcessor processor = new StringProcessor();
+
+        // Лямбда сохраняется, но не выполняется сразу
+        processor.setLengthChecker(input -> {
+            System.out.println("Length check started");
+            if (input.length() > 5) {
+                System.out.println("String is too long!");
+            } else {
+                System.out.println("String length is fine.");
+            }
+        });
+
+        // Текущий момент
+        System.out.println("Before length check");
+
+        // Лямбда выполняется только при вызове метода
+        processor.processLengthCheck("hello world");
+
+        // Текущий момент после вызова
+        System.out.println("After length check");
+    }
+}
+В этом примере лямбда сохраняется в методе setLengthChecker, но не выполняется сразу. Она будет выполнена позже, когда метод processLengthCheck вызовет её.
+
+Сообщение “Before length check” выводится до выполнения лямбды. Лямбда-выражение выполняется только при вызове метода processLengthCheck, и тогда выводится сообщение “Length check started”. После этого программа продолжает выполнение, и выводится сообщение “After length check”.
+
+Более наглядно это можно увидеть во время выполнения программы в режиме дебага.
+
+
+
+0:00
+/0:35
+
+1×
+
+
+💡
+Отложенное выполнение лямбд позволяет им захватывать текущее состояние переменных на момент их фактического выполнения, а не в момент объявления. Если состояние программы изменилось между объявлением и вызовом лямбды, она выполнится с актуальными данными.
+Пример, демонстрирующий изменение состояния между объявлением лямбды и её вызовом:
+
+
+
+0:00
+/0:29
+
+1×
+
+
+В этом примере, хотя лямбда была настроена, когда строка имела значение "hello", на момент выполнения лямбды переменная уже изменилась и стала "hello world". Это показывает, что лямбда захватывает ссылку на переменную, а не её значение в момент объявления.
+
+Ограничения лямбда-выражений
+Хотя лямбда-выражения значительно упрощают код, они имеют свои ограничения. Рассмотрим ключевые ограничения лямбд в Java.
+
+Переменные должны быть effectively final: Переменные, которые используются внутри лямбды, должны быть либо final, либо effectively final — это значит, что их значение не должно изменяться после инициализации.
+
+int threshold = 5;
+processor.setLengthChecker(input -> {
+    if (input.length() > threshold) {
+        System.out.println("String is too long!");
+    } else {
+        System.out.println("String length is fine.");
+    }
+});
+Переменная threshold не может изменяться после её объявления. Если бы вы попытались изменить её значение после создания лямбды, это привело бы к ошибке компиляции. Лямбда захватывает значения переменных только на момент их создания.
+
+Лямбды не могут иметь состояния: Лямбда-выражения не могут содержать поля или изменяемые внутренние переменные. В отличие от анонимных классов, лямбды не могут хранить своё состояние, что ограничивает их в ситуациях, где требуется сохранять данные внутри объекта.
+
+Пример с анонимным классом:
+
+processor.setLengthChecker(new LengthChecker() {
+    private int count = 0;  // Поле для хранения состояния
+
+    @Override
+    public void checkLength(String input) {
+        count++;  // Изменение состояния
+        System.out.println("Check count: " + count);
+        // Логика проверки длины строки
+    }
+});
+Лямбды не позволяют такой подход, так как они не поддерживают поля. Все переменные, к которым обращается лямбда, должны быть либо final, либо effectively final.
+
+Лямбда-выражения не могут бросать проверяемые исключения. Если метод интерфейса не объявляет исключений, лямбда не может напрямую бросать проверяемые исключения без их обработки. Это требует оборачивать вызовы методов, которые могут бросать проверяемые исключения, в блок try-catch.
+
+processor.setLengthChecker(input -> {
+    try {
+        Files.readAllLines(Paths.get("somefile.txt"));
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+});
+В этом примере приходится оборачивать код в блок try-catch, так как метод readAllLines может выбросить исключение IOException.
+
+Ограниченная гибкость в наследовании: Лямбда-выражения не поддерживают наследование. В отличие от анонимных классов, которые могут наследовать другие классы или реализовывать несколько интерфейсов, лямбда всегда может реализовать только один функциональный интерфейс.
+
+Отсутствие метаинформации: Лямбды не имеют имени и не могут содержать аннотации.
+
+Системные функциональные интерфейсы
+В Java существует набор предопределённых системных функциональных интерфейсов в пакете java.util.function. Эти интерфейсы покрывают типичные сценарии использования функциональных стилей программирования и позволяют избежать создания собственных интерфейсов в большинстве случаев. Они широко используются в Stream API и Optional.
+
+Глубокое погружение в Stream API Java: Понимание и Применение
+В этой статье мы погрузимся в мир Stream API, узнаем, что это такое и как этим пользоваться, разберем реальные примеры и советы по лучшим практикам.
+
+struchkov.dev
+Struchkov Mark
+Большой гайд по Optional в Java
+Разбираемся, как уменьшить шанс получить NullPointerException, используя класс Optional.
+
+struchkov.dev
+Struchkov Mark
+Function<T, R> — преобразование значений
+Интерфейс Function<T, R> описывает функцию, которая принимает аргумент типа T и возвращает результат типа R. Этот интерфейс полезен для задач, связанных с преобразованием данных.
+
+Пример: Преобразование строки в верхний регистр:
+
+Function<String, String> toUpperCase = s -> s.toUpperCase();
+System.out.println(toUpperCase.apply("hello"));  // Output: HELLO
+Predicate<T> — проверка условий
+Predicate<T> представляет собой предикат, проверяющий условие, и возвращает true или false. Используется для фильтрации данных или проверок различных условий.
+
+Пример: Проверка, превышает ли длина строки 5 символов:
+
+Predicate<String> isLongerThan5 = s -> s.length() > 5;
+System.out.println(isLongerThan5.test("hello"));  // Output: false
+Consumer<T> — выполнение действий без возврата
+Consumer<T> описывает операцию, которая принимает аргумент типа T, но не возвращает результат. Это удобно для выполнения побочных действий, таких как вывод на экран или запись в файл.
+
+Пример: Логирование строки в консоль:
+
+Consumer<String> print = s -> System.out.println(s);
+print.accept("Hello, World!");  // Output: Hello, World!
+Supplier<T> — генерация значений
+Supplier<T> — это функция, которая не принимает аргументов, но возвращает значение типа T. Он полезен в тех случаях, когда необходимо отложенно генерировать или предоставлять значения.
+
+Пример использования: Генерация случайных чисел или получение текущего времени.
+
+Supplier<Double> randomSupplier = () -> Math.random();
+System.out.println(randomSupplier.get());  // Output: (какое-то случайное число)
+UnaryOperator<T> — унарные операции
+UnaryOperator<T> — это подтип Function, который принимает и возвращает значения одного типа. Он используется для операций, где вход и выход имеют один и тот же тип.
+
+Пример использования: Преобразование строки или модификация чисел.
+
+UnaryOperator<String> toUpperCase = s -> s.toUpperCase();
+System.out.println(toUpperCase.apply("hello"));  // Output: HELLO
+BinaryOperator<T> — бинарные операции
+BinaryOperator<T> — это подтип BiFunction, который принимает два аргумента одного типа и возвращает результат того же типа. Этот интерфейс часто используется для операций над числами или другими значениями, где входные параметры и результат имеют один тип.
+
+Пример использования: Сложение двух чисел или объединение строк.
+
+BinaryOperator<Integer> sum = (a, b) -> a + b;
+System.out.println(sum.apply(5, 3));  // Output: 8
+Ссылки на методы
+Ссылки на методы (method references) — это ещё один способ работы с функциональными интерфейсами в Java, введённый вместе с лямбда-выражениями в Java 8.
+
+С их помощью можно ссылаться на существующие методы или конструкторы и передавать их в качестве аргументов.
+
+Существует четыре типа ссылок на методы:
+
+Ссылка на статический метод.
+Ссылка на метод объекта.
+Ссылка на метод класса через объект.
+Ссылка на конструктор.
+Ссылка на статический метод
+Если метод является статическим, мы можем ссылаться на него с помощью синтаксиса ClassName::methodName.
+
+Function<Double, Double> sqrt = Math::sqrt;
+System.out.println(sqrt.apply(16.0));  // Output: 4.0
+Этот пример показывает, что вместо лямбда-выражения x -> Math.sqrt(x) можно использовать ссылку на метод Math::sqrt, так как лямбда просто вызывает статический метод sqrt.
+
+Ссылка на метод объекта
+Если у нас есть объект, мы можем ссылаться на его метод с помощью синтаксиса object::methodName.
+
+String message = "Hello, World!";
+Supplier<Integer> stringLength = message::length;
+System.out.println(stringLength.get());  // Output: 13
+Здесь лямбда () -> message.length() может быть заменена на ссылку на метод message::length, так как метод length не принимает аргументов и возвращает длину строки.
+
+Ссылка на метод экземпляра через класс
+Этот тип ссылки на метод используется, когда метод будет вызван на объекте, переданном в качестве аргумента. Синтаксис — ClassName::methodName.
+
+Function<String, String> toUpperCase = String::toUpperCase;
+System.out.println(toUpperCase.apply("hello"));  // Output: HELLO
+Здесь лямбда s -> s.toUpperCase() заменена на ссылку String::toUpperCase. Важно отметить, что метод toUpperCase вызывается на строке, которая передается в качестве аргумента.
+
+Ссылка на конструктор
+Мы можем использовать ссылки на конструкторы для создания объектов через функциональные интерфейсы, которые возвращают новые экземпляры. Синтаксис — ClassName::new.
+
+Supplier<List<String>> listSupplier = ArrayList::new;
+List<String> myList = listSupplier.get();
+Здесь лямбда () -> new ArrayList<>() заменена на ссылку на конструктор ArrayList::new.
+
+Подписывайся
+на Struchkov.Dev в Telegram
+Хранение в памяти и работа в JVM
+С появлением лямбда-выражений в Java 8 (JSR-292), компилятор и JVM начали использовать новые механизмы. Вместо создания анонимного класса при компиляции лямбды, компилятор генерирует байткод с использованием команды invokedynamic. Эта команда указывает JVM создать объект динамически во время выполнения. Хотя в байткоде содержится ссылка на метод, который будет вызван через лямбду, реальная реализация создается непосредственно при выполнении программы.
+
+Как это работает
+Когда вы пишете лямбда-выражение, компилятор Java не создаёт отдельный класс или анонимный внутренний класс. Вместо этого он генерирует инструкцию invokedynamic, которая откладывает создание объекта до времени выполнения.
+
+Во время выполнения инструкции invokedynamic JVM обращается к специальному bootstrap-методу, который отвечает за создание объекта. В случае лямбд таким методом является LambdaMetafactory.metafactory. Этот метод динамически создает реализацию функционального интерфейса для конкретной лямбды и связывает её с целевым методом, содержащим логику выражения.
+
+JVM оптимизирует этот процесс, создавая объект лямбды только один раз, если она не захватывает состояние из окружающего контекста. Это значит, что если лямбда используется повторно в одном и том же контексте, JVM будет переиспользовать уже созданный объект.
+
+Рассмотрим пример лямбда-выражения:
+
+Runnable r = () -> System.out.println("Lambda example");
+Вместо создания анонимного класса байткод выглядит следующим образом:
+
+  INVOKEDYNAMIC run()Ljava/lang/Runnable; [
+    // Bootstrap Methods:
+    0: #34 invokestatic java/lang/invoke/LambdaMetafactory.metafactory : 
+        (Ljava/lang/invoke/MethodHandles$Lookup;
+         Ljava/lang/String;
+         Ljava/lang/invoke/MethodType;
+         Ljava/lang/invoke/MethodType;
+         Ljava/lang/invoke/MethodHandle;
+         Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;
+  ]
+Разбор этого байткода:
+
+INVOKEDYNAMIC: Инструкция, которая указывает JVM выполнить динамический вызов метода. Она содержит информацию о методе и ссылку на bootstrap-метод.
+Bootstrap Methods: Специальные методы, которые JVM вызывает для настройки точки вызова (Call Site). Здесь используется LambdaMetafactory.metafactory.
+Аргументы LambdaMetafactory.metafactory:
+MethodHandles.Lookup: Объект, предоставляющий доступ к методам и полям классов.
+String: Имя метода функционального интерфейса (в случае Runnable это run).
+MethodType: Описывает сигнатуры методов, используемых в процессе создания лямбды.
+MethodHandle: Ссылка на метод, содержащий реализацию лямбды (в данном случае это System.out.println("Lambda example")).
+Механизм invokedynamic позволяет JVM гибко оптимизировать выполнение лямбд:
+
+Кэширование: Если лямбда не захватывает состояние, JVM создаёт лишь один экземпляр, который переиспользуется.
+Отложенное создание: Объекты лямбд создаются при первом вызове, а не во время компиляции. Это уменьшает время загрузки программы и экономит память, если лямбда не будет вызвана.
+Инлайн-оптимизация: JVM может встроить логику лямбды непосредственно в вызывающий код, уменьшая количество вызовов методов и повышая производительность программы.
+Создание лямбд с использованием LambdaMetafactory
+Чтобы лучше понять, как работает LambdaMetafactory.metafactory для создания лямбда-выражений, принимающих аргументы, рассмотрим пример динамического создания лямбды без использования стандартного синтаксиса ->. Вместо этого, мы вручную вызываем LambdaMetafactory.metafactory, чтобы создать реализацию функционального интерфейса.
+
+import java.lang.invoke.*;
+
+public class LambdaMetafactoryExampleWithArgs {
+    public static void main(String[] args) throws Throwable {
+        // Получаем объект Lookup для доступа к методам
+        MethodHandles.Lookup lookup = MethodHandles.lookup();
+
+        // Определяем типы методов
+        MethodType invokedType = MethodType.methodType(MyFunctionalInterface.class);
+        MethodType samMethodType = MethodType.methodType(void.class, String.class);
+        MethodType implMethodType = MethodType.methodType(void.class, String.class);
+
+        // Находим метод, который будет вызван
+        MethodHandle implMethod = lookup.findStatic(LambdaMetafactoryExampleWithArgs.class, "runMe", implMethodType);
+
+        // Вызываем LambdaMetafactory.metafactory для создания CallSite
+        CallSite callSite = LambdaMetafactory.metafactory(
+                lookup,
+                "run",
+                invokedType,
+                samMethodType,
+                implMethod,
+                implMethodType
+        );
+
+        // Получаем экземпляр функционального интерфейса
+        MyFunctionalInterface myFunc = (MyFunctionalInterface) callSite.getTarget().invokeExact();
+
+        // Используем созданный экземпляр интерфейса
+        myFunc.run("Hello with args!");
+    }
+
+    // Метод, который будет использоваться в качестве реализации
+    public static void runMe(String message) {
+        System.out.println(message);
+    }
+
+    @FunctionalInterface
+    interface MyFunctionalInterface {
+        void run(String message);
+    }
+}
+Мы создаём объект Lookup, который предоставляет доступ к методам и полям текущего класса. Это будет нужно позже для эмуляции лямбды.
+
+Определяем тип метода (invokedType), который будет возвращать экземпляр функционального интерфейса MyFunctionalInterface. В данном случае это тип MyFunctionalInterface.
+
+Указываем сигнатуру метода (samMethodType) — единственного абстрактного метода в интерфейсе. В нашем примере это метод run(String message), возвращающий void.
+
+Описываем сигнатуру метода реализации (implMethodType), который будет вызван при выполнении метода run. В данном случае — это void runMe(String message).
+
+Чтобы сэмулировать работу лямбды, мы используем статический метод runMe, который динамически свяжем с функциональным интерфейсом. Для этого, с помощью объекта lookup, находим метод runMe, соответствующий сигнатуре implMethodType. И вызываем LambdaMetafactory.metafactory, чтобы создать CallSite, связывающий абстрактный метод интерфейса с нашей реализацией.
+
+Далее вызываем метод invokeExact() на целевом объекте CallSite, который возвращает реализацию интерфейса MyFunctionalInterface. Эта реализация связывает метод run с методом runMe, который мы описали.
+
+В итоге вызываем метод run, который, в свою очередь, вызывает наш метод runMe с переданным сообщением.
