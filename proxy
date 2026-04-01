@@ -1,0 +1,131 @@
+
+https://javarush.com/quests/lectures/ru.javarush.java.spring.lecture.level03.lecture07
+
+Как работают прокси-объекты?
+В основе AOP в Spring лежит использование прокси-объектов. Если вы добавляете аспект (например, через @Aspect), Spring динамически создает прокси-объект, который подменяет оригинальный бин. Когда вызывается метод на этом бине, вызов сначала проходит через прокси-объект, а затем уже достигает целевого метода.
+
+ALL IN ONE
+Ход выполнения:
+
+Вызываете метод на вашем бине.
+Прокси-объект перехватывает вызов.
+Прокси выполняет свой "дополнительный код" (например, логирование, проверку транзакций).
+Прокси передает управление в целевой метод вашего бина.
+Типы прокси в Spring
+Spring поддерживает два типа прокси:
+
+JDK Dynamic Proxy — работает с интерфейсами.
+CGLIB Proxy — работает с классами.
+JDK Dynamic Proxy
+
+JDK Dynamic Proxy создаёт прокси-объекты только для интерфейсов. Если ваш класс реализует интерфейс, Spring создаст прокси с помощью JDK Dynamic Proxy.
+
+Пример:
+
+public interface PaymentService {
+    void processPayment();
+}
+
+@Component
+public class PaymentServiceImpl implements PaymentService {
+    @Override
+    public void processPayment() {
+        System.out.println("Processing payment...");
+    }
+}
+В этом случае Spring создаст прокси для интерфейса PaymentService. Прокси будет перехватывать вызовы метода processPayment().
+
+CGLIB Proxy
+
+Если ваш бин не реализует интерфейсов, Spring использует CGLIB Proxy. Этот тип прокси расширяет (наследует) ваш класс и переопределяет методы для добавления дополнительной логики.
+
+Пример:
+
+@Component
+public class NotificationService {
+    public void sendNotification() {
+        System.out.println("Sending notification...");
+    }
+}
+Поскольку класс NotificationService не реализует интерфейсов, Spring создаст прокси с использованием CGLIB.
+
+Важно: CGLIB не работает с методами, помеченными как final. Почему? Потому что final запрещает переопределение метода, что ломает всю логику прокси.
+
+Пример использования прокси-объектов в AOP
+Создадим пример, где мы используем прокси для проставления логов при вызове метода.
+
+Код без AOP:
+
+@Component
+public class UserService {
+    public void createUser(String username) {
+        System.out.println("User " + username + " created!");
+    }
+}
+Этот код просто выводит сообщение о создании пользователя. Но если мы хотим автоматически логировать каждый вызов метода createUser, нам придётся модифицировать метод. Это нарушает принцип единственной ответственности.
+
+Код с AOP и прокси:
+
+Создаём аспект:
+
+@Aspect
+@Component
+public class LoggingAspect {
+
+    @Before("execution(* com.example.demo.UserService.createUser(..))")
+    public void logBefore(JoinPoint joinPoint) {
+        System.out.println("Method " + joinPoint.getSignature().getName() + " is called");
+    }
+}
+Теперь при вызове метода createUser Spring будет использовать прокси-объект. Прокси сначала выполнит метод logBefore, а только потом вызовет createUser.
+
+Как увидеть "магический" прокси в действии?
+Вы можете посмотреть, как Spring создаёт прокси-объекты, с помощью простого теста. Например:
+
+@Autowired
+private UserService userService;
+
+@Test
+public void checkProxy() {
+    System.out.println(userService.getClass());
+}
+Вывод может быть следующим:
+
+Для JDK Dynamic Proxy:
+class com.sun.proxy.$Proxy12
+Для CGLIB Proxy:
+class com.example.demo.UserService$$EnhancerBySpringCGLIB$$3f9b8a5f
+Обратите внимание, как Spring добавляет свои "волшебные" суффиксы к имени класса.
+
+Почему важно понимать прокси?
+Чтобы эффективно работать с AOP и не натыкаться на подводные камни, важно понимать, как работают прокси.
+
+Типичные ошибки:
+
+Вызов методов внутри самого класса: Если вы вызываете метод из другого метода того же класса, AOP не сработает. Прокси не сможет перехватить вызов, так как он идёт напрямую, минуя прокси-объект.
+Пример:
+
+@Component
+public class SampleService {
+
+    public void externalMethod() {
+        internalMethod(); // Прокси не сработает!
+    }
+
+    public void internalMethod() {
+        System.out.println("Internal method called");
+    }
+}
+Решение: разделите методы на разные бины.
+
+Final методы: Если вы используете CGLIB Proxy, то объявление метода как final приведёт к тому, что прокси не сможет его переопределить. Это также сделает AOP бесполезным для этого метода.
+Пример:
+
+public final void finalMethod() {
+    System.out.println("This method cannot be proxied");
+}
+Практическая значимость
+Понимание работы прокси помогает избежать ошибок и сделать код более понятным. В реальных проектах прокси используются не только для аспектов, но и для управления транзакциями и безопасности. Например:
+
+Аннотация @Transactional в Spring тоже основана на AOP и прокси. Если вы не понимаете, что прокси не сработает при вызове метода внутри того же класса, вы можете получить неожиданные результаты, например, отсутствие отката транзакции.
+Мы узнали, что прокси-объекты играют ключевую роль в реализации AOP в Spring. Они позволяют добавлять кросс-сечения (аспекты) без изменения бизнес-логики. Spring умело использует динамические прокси JDK и CGLIB Proxy, в зависимости от конкретного бина. Теперь вы вооружены этим знанием и готовы к ещё более глубокому использованию аспектов в своих приложениях.
